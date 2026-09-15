@@ -1,0 +1,304 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'core/theme/colors.dart';
+import 'core/theme/theme.dart';
+import 'features/community/models/community_post.dart';
+import 'features/community/screens/community_screen.dart';
+import 'features/community/screens/post_detail_screen.dart';
+import 'features/onboarding/screens/onboarding_screen.dart';
+import 'features/practice/screens/breathing_screen.dart';
+import 'features/practice/screens/practice_screen.dart';
+import 'features/progress/screens/progress_screen.dart';
+import 'features/settings/screens/privacy_screen.dart';
+import 'features/settings/screens/settings_screen.dart';
+import 'features/settings/screens/terms_screen.dart';
+import 'features/situations/screens/situations_screen.dart';
+import 'features/splash/screens/splash_screen.dart';
+
+CustomTransitionPage<void> _slideFadePage(LocalKey key, Widget child) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.04),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+final _routerProvider = Provider<GoRouter>((ref) {
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const OnboardingScreen()),
+      ),
+      ShellRoute(
+        builder: (context, state, child) =>
+            _AppShell(state: state, child: child),
+        routes: [
+          GoRoute(
+            path: '/situations',
+            pageBuilder: (context, state) =>
+                _slideFadePage(state.pageKey, const SituationsScreen()),
+          ),
+          GoRoute(
+            path: '/community',
+            pageBuilder: (context, state) =>
+                _slideFadePage(state.pageKey, const CommunityScreen()),
+          ),
+          GoRoute(
+            path: '/progress',
+            pageBuilder: (context, state) =>
+                _slideFadePage(state.pageKey, const ProgressScreen()),
+          ),
+          GoRoute(
+            path: '/settings',
+            pageBuilder: (context, state) =>
+                _slideFadePage(state.pageKey, const SettingsScreen()),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/practice/:scenarioId',
+        pageBuilder: (context, state) {
+          final scenarioId = state.pathParameters['scenarioId']!;
+          return _slideFadePage(
+            state.pageKey,
+            PracticeScreen(scenarioId: scenarioId),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/post/:postId',
+        pageBuilder: (context, state) {
+          final postId = state.pathParameters['postId']!;
+          final post = state.extra as CommunityPost?;
+          return _slideFadePage(
+            state.pageKey,
+            PostDetailScreen(postId: postId, initialPost: post),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/breathing',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const BreathingScreen()),
+      ),
+      GoRoute(
+        path: '/terms',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const TermsScreen()),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const PrivacyScreen()),
+      ),
+    ],
+  );
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+class CadenceApp extends ConsumerWidget {
+  const CadenceApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(_routerProvider);
+
+    return MaterialApp.router(
+      title: 'Cadence',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.light,
+      routerConfig: router,
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class _AppShell extends StatelessWidget {
+  final Widget child;
+  final GoRouterState state;
+
+  const _AppShell({required this.child, required this.state});
+
+  int _currentIndex(String location) {
+    if (location.startsWith('/situations')) return 0;
+    if (location.startsWith('/community')) return 1;
+    if (location.startsWith('/progress')) return 2;
+    if (location.startsWith('/settings')) return 3;
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final index = _currentIndex(state.matchedLocation);
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        bottom: false,
+        child: child,
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                _NavItem(
+                  icon: Icons.bolt_outlined,
+                  label: 'Practice',
+                  isActive: index == 0,
+                  onTap: () => context.go('/situations'),
+                ),
+                _NavItem(
+                  icon: Icons.group_outlined,
+                  label: 'Community',
+                  isActive: index == 1,
+                  onTap: () => context.go('/community'),
+                ),
+                _NavItem(
+                  icon: Icons.bar_chart,
+                  label: 'Progress',
+                  isActive: index == 2,
+                  onTap: () => context.go('/progress'),
+                ),
+                _NavItem(
+                  icon: Icons.person_outline,
+                  label: 'Profile',
+                  isActive: index == 3,
+                  onTap: () => context.go('/settings'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  // hPad is the horizontal padding on each side of the active pill content.
+  // The label SizedBox is computed precisely from the slot width so the inner
+  // Row(mainAxisSize: min) can never exceed its parent and trigger overflow.
+  static const double _hPad = 12.0;
+  static const double _iconSize = 20.0;
+  static const double _gap = 6.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final slotWidth = constraints.maxWidth;
+          // Available width for the label after padding, icon, and gap are accounted for.
+          final labelWidth = isActive
+              ? (slotWidth - 2 * _hPad - _iconSize - _gap).clamp(0.0, double.infinity)
+              : 0.0;
+
+          return GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOutCubic,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _hPad,
+                  vertical: 10.0,
+                ),
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: _iconSize,
+                      color: isActive ? Colors.white : const Color(0xFF9E9E9E),
+                    ),
+                    // SizedBox has an explicit width derived from the slot, so
+                    // the Row can never exceed (icon + gap + labelWidth) which
+                    // equals exactly slotWidth - 2*_hPad. No overflow possible.
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOutCubic,
+                      child: SizedBox(
+                        width: labelWidth > 0 ? labelWidth + _gap : 0,
+                        child: isActive
+                            ? Padding(
+                                padding: const EdgeInsets.only(left: _gap),
+                                child: Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.figtree(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
