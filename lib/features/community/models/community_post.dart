@@ -7,6 +7,7 @@ class CommunityPost {
   final int likeCount;
   final int commentCount;
   final bool isLikedByCurrentUser;
+  final String? situationTag;
 
   const CommunityPost({
     required this.id,
@@ -17,6 +18,7 @@ class CommunityPost {
     this.likeCount = 0,
     this.commentCount = 0,
     this.isLikedByCurrentUser = false,
+    this.situationTag,
   });
 
   factory CommunityPost.fromJson(
@@ -36,6 +38,7 @@ class CommunityPost {
       commentCount: replies.length,
       isLikedByCurrentUser: currentUserId != null &&
           likes.any((l) => (l as Map)['user_id'] == currentUserId),
+      situationTag: json['situation_tag'] as String?,
     );
   }
 }

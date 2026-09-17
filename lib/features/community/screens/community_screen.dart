@@ -8,9 +8,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/colors.dart';
 import '../../../services/auth_service.dart';
+import '../../messages/providers/messages_provider.dart';
+import '../../notifications/providers/notifications_provider.dart';
 import '../models/community_post.dart';
 import '../providers/community_provider.dart';
 import '../widgets/initial_avatar.dart';
+import '../widgets/situation_tag_chip.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -121,6 +124,72 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     ),
                   ),
                   GestureDetector(
+                    onTap: () => context.push('/community/search'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(Icons.search, size: 22, color: cs.onSurface.withValues(alpha: 0.7)),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.push('/messages'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(Icons.mail_outline_rounded,
+                              size: 22, color: cs.onSurface.withValues(alpha: 0.7)),
+                          if (ref.watch(unreadThreadCountProvider) > 0)
+                            Positioned(
+                              right: -1,
+                              top: -1,
+                              child: Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: AppColors.error,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Theme.of(context).scaffoldBackgroundColor,
+                                      width: 1.5),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.push('/notifications'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(Icons.notifications_none_rounded,
+                              size: 22, color: cs.onSurface.withValues(alpha: 0.7)),
+                          if (ref.watch(unreadNotificationCountProvider) > 0)
+                            Positioned(
+                              right: -1,
+                              top: -1,
+                              child: Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: AppColors.error,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Theme.of(context).scaffoldBackgroundColor,
+                                      width: 1.5),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
                     onTap: () => context.go('/settings'),
                     child:
                         InitialAvatar(name: user.email ?? '?', size: 30),
@@ -128,7 +197,53 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: GestureDetector(
+                onTap: () => context.push('/community/daily-post'),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_note_rounded, size: 22, color: AppColors.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'What did you try today?',
+                              style: GoogleFonts.figtree(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Share a moment, tag the situation.',
+                              style: GoogleFonts.figtree(
+                                fontSize: 12,
+                                color: cs.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: TabBar(
@@ -153,7 +268,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               child: TabBarView(
                 children: [
                   _PostsFeed(sort: _FeedSort.trending),
-                  const _FollowingPlaceholder(),
+                  const _FollowingFeed(),
                   _PostsFeed(sort: _FeedSort.newest),
                 ],
               ),
@@ -484,38 +599,65 @@ class _PostsFeed extends ConsumerWidget {
   }
 }
 
-// ─── Following placeholder ────────────────────────────────────────────────────
+// ─── Following feed ───────────────────────────────────────────────────────────
 
-class _FollowingPlaceholder extends StatelessWidget {
-  const _FollowingPlaceholder();
+class _FollowingFeed extends ConsumerWidget {
+  const _FollowingFeed();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.group_outlined,
-              size: 36,
-              color: cs.onSurface.withValues(alpha: 0.18),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Follow others to see their posts here.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.figtree(
-                fontSize: 15,
-                color: cs.onSurface.withValues(alpha: 0.35),
-                height: 1.55,
-              ),
-            ),
-          ],
+    final postsAsync = ref.watch(followingFeedProvider);
+
+    return postsAsync.when(
+      loading: () => ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        itemCount: 3,
+        itemBuilder: (context, _) => const _PostCardSkeleton(),
+      ),
+      error: (e, _) => Center(
+        child: Text(
+          'Could not load your following feed.',
+          style: GoogleFonts.figtree(
+            fontSize: 14,
+            color: cs.onSurface.withValues(alpha: 0.4),
+          ),
         ),
       ),
+      data: (posts) {
+        if (posts.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.group_outlined,
+                    size: 36,
+                    color: cs.onSurface.withValues(alpha: 0.18),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Follow others to see their posts here.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.figtree(
+                      fontSize: 15,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                      height: 1.55,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          itemCount: posts.length,
+          itemBuilder: (context, index) => _PostCard(post: posts[index]),
+        );
+      },
     );
   }
 }
@@ -570,33 +712,39 @@ class _PostCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Row(
-              children: [
-                InitialAvatar(name: post.displayName, size: 32),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.displayName,
-                        style: GoogleFonts.figtree(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
+            GestureDetector(
+              onTap: () => context.push('/community/user/${post.userId}'),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                children: [
+                  InitialAvatar(name: post.displayName, size: 32),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.displayName,
+                          style: GoogleFonts.figtree(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _relativeTime(post.createdAt),
-                        style: GoogleFonts.figtree(
-                          fontSize: 11,
-                          color: cs.onSurface.withValues(alpha: 0.35),
+                        Text(
+                          _relativeTime(post.createdAt),
+                          style: GoogleFonts.figtree(
+                            fontSize: 11,
+                            color: cs.onSurface.withValues(alpha: 0.35),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  if (post.situationTag != null)
+                    SituationTagChip(situationTag: post.situationTag),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             // Content
@@ -639,7 +787,7 @@ class _PostCard extends ConsumerWidget {
                           key: ValueKey(isLiked),
                           size: 17,
                           color: isLiked
-                              ? AppColors.gold
+                              ? AppColors.like
                               : cs.onSurface.withValues(alpha: 0.35),
                         ),
                       ),
@@ -649,7 +797,7 @@ class _PostCard extends ConsumerWidget {
                         style: GoogleFonts.figtree(
                           fontSize: 13,
                           color: isLiked
-                              ? AppColors.gold
+                              ? AppColors.like
                               : cs.onSurface.withValues(alpha: 0.45),
                         ),
                       ),
@@ -657,22 +805,29 @@ class _PostCard extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 18),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      size: 16,
-                      color: cs.onSurface.withValues(alpha: 0.35),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${post.commentCount}',
-                      style: GoogleFonts.figtree(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.45),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => context.push(
+                    '/post/${post.id}?scrollToComments=true',
+                    extra: post,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 16,
+                        color: cs.onSurface.withValues(alpha: 0.35),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        '${post.commentCount}',
+                        style: GoogleFonts.figtree(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

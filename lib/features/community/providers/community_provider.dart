@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/auth_service.dart';
 import '../models/community_post.dart';
 import '../models/community_reply.dart';
+import 'follow_provider.dart';
 
 final _db = Supabase.instance.client;
 
@@ -15,7 +16,7 @@ Future<List<CommunityPost>> _fetchPosts(String? currentUserId) async {
   final rows = await _db
       .from('community_posts')
       .select(
-        'id, user_id, body, created_at, '
+        'id, user_id, body, created_at, situation_tag, '
         'profiles(display_name), '
         'post_likes(user_id), '
         'community_replies(id)',
@@ -43,12 +44,28 @@ final communityPostsProvider =
 
   fetchAndEmit();
 
+  // A like or reply from another user doesn't touch community_posts
+  // itself, so the feed needs to refetch on those tables too, or a
+  // viewer's like/comment counts would only ever reflect what was on
+  // screen when the feed first loaded.
   final channel = _db
       .channel('community_posts_changes')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'community_posts',
+        callback: (_) => fetchAndEmit(),
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'post_likes',
+        callback: (_) => fetchAndEmit(),
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'community_replies',
         callback: (_) => fetchAndEmit(),
       )
       .subscribe();
@@ -66,7 +83,10 @@ final communityPostsProvider =
 class NewPostNotifier extends StateNotifier<AsyncValue<void>> {
   NewPostNotifier() : super(const AsyncValue.data(null));
 
-  Future<bool> submit(String body) async {
+  /// [situationTag] is the Scenario.id this post relates to (see
+  /// lib/features/situations/data/scenarios.dart), used by the daily
+  /// "What did you try today?" compose flow. Null for a generic post.
+  Future<bool> submit(String body, {String? situationTag}) async {
     final user = _db.auth.currentUser;
     if (user == null || body.trim().isEmpty) return false;
     state = const AsyncValue.loading();
@@ -74,6 +94,7 @@ class NewPostNotifier extends StateNotifier<AsyncValue<void>> {
       await _db.from('community_posts').insert({
         'user_id': user.id,
         'body': body.trim(),
+        if (situationTag != null) 'situation_tag': situationTag,
       });
       state = const AsyncValue.data(null);
       return true;
@@ -87,6 +108,56 @@ class NewPostNotifier extends StateNotifier<AsyncValue<void>> {
 final newPostProvider =
     StateNotifierProvider.autoDispose<NewPostNotifier, AsyncValue<void>>((ref) {
   return NewPostNotifier();
+});
+
+// ─── Following feed ───────────────────────────────────────────────────────────
+
+final followingFeedProvider =
+    FutureProvider.autoDispose<List<CommunityPost>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  final followingIds = await ref.watch(followingIdsProvider.future);
+  if (followingIds.isEmpty) return [];
+
+  final rows = await _db
+      .from('community_posts')
+      .select(
+        'id, user_id, body, created_at, situation_tag, '
+        'profiles(display_name), '
+        'post_likes(user_id), '
+        'community_replies(id)',
+      )
+      .inFilter('user_id', followingIds.toList())
+      .order('created_at', ascending: false)
+      .limit(50);
+  return (rows as List)
+      .map((r) => CommunityPost.fromJson(
+            r as Map<String, dynamic>,
+            currentUserId: user.id,
+          ))
+      .toList();
+});
+
+// ─── Single post by id ────────────────────────────────────────────────────────
+
+/// Used when PostDetailScreen is reached without an in-memory CommunityPost
+/// (e.g. from a 'like' notification, which only has a postId) — the feed
+/// screens pass the post via `extra` instead and skip this fetch.
+final postByIdProvider =
+    FutureProvider.autoDispose.family<CommunityPost?, String>((ref, postId) async {
+  final currentUserId = ref.watch(currentUserProvider)?.id;
+  final row = await _db
+      .from('community_posts')
+      .select(
+        'id, user_id, body, created_at, situation_tag, '
+        'profiles(display_name), '
+        'post_likes(user_id), '
+        'community_replies(id)',
+      )
+      .eq('id', postId)
+      .maybeSingle();
+  if (row == null) return null;
+  return CommunityPost.fromJson(row, currentUserId: currentUserId);
 });
 
 // ─── Likes (optimistic) ───────────────────────────────────────────────────────
@@ -220,4 +291,27 @@ class AddReplyNotifier extends StateNotifier<AsyncValue<void>> {
 final addReplyProvider =
     StateNotifierProvider.autoDispose<AddReplyNotifier, AsyncValue<void>>((ref) {
   return AddReplyNotifier();
+});
+
+// ─── Delete comment ───────────────────────────────────────────────────────────
+
+class DeleteCommentNotifier extends StateNotifier<AsyncValue<void>> {
+  DeleteCommentNotifier() : super(const AsyncValue.data(null));
+
+  /// RLS allows this for the comment's own author or the post's author
+  /// (see 20260917000000_comments_delete_and_notify.sql) — no client-side
+  /// permission check needed beyond deciding whether to show the option.
+  Future<bool> delete(String commentId) async {
+    try {
+      await _db.from('community_replies').delete().eq('id', commentId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+final deleteCommentProvider =
+    StateNotifierProvider.autoDispose<DeleteCommentNotifier, AsyncValue<void>>((ref) {
+  return DeleteCommentNotifier();
 });

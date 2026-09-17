@@ -32,6 +32,13 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# Some plugins (flutter_local_notifications_windows, permission_handler_windows)
+# still build against the old MSVC coroutine TS (<experimental/coroutine>),
+# which newer MSVC toolchains turn into a hard error instead of a warning.
+# This matches the workaround the compiler itself suggests; it only silences
+# that deprecation, it doesn't change behavior.
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

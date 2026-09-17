@@ -8,8 +8,12 @@ class AppColors {
   // Primary accent — deep indigo
   static const primary = Color(0xFF2D2A4A);
 
-  // Gold — only for liked state, completions, rewards
+  // Gold — completions, rewards
   static const gold = Color(0xFFC9A84C);
+
+  // Like (heart) icon — liked state only. Reads as "liked" against the
+  // ivory background without clashing with the error red.
+  static const like = Color(0xFFE0434B);
 
   // Error
   static const error = Color(0xFF9B2335);

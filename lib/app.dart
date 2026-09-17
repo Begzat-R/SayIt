@@ -6,7 +6,16 @@ import 'core/theme/colors.dart';
 import 'core/theme/theme.dart';
 import 'features/community/models/community_post.dart';
 import 'features/community/screens/community_screen.dart';
+import 'features/community/screens/daily_post_screen.dart';
+import 'features/community/screens/follow_list_screen.dart';
 import 'features/community/screens/post_detail_screen.dart';
+import 'features/community/screens/search_screen.dart';
+import 'features/community/screens/user_profile_screen.dart';
+import 'features/messages/screens/messages_screen.dart';
+import 'features/messages/screens/thread_screen.dart';
+import 'features/messages/widgets/new_message_banner.dart';
+import 'features/notifications/providers/notifications_provider.dart';
+import 'features/notifications/screens/notifications_screen.dart';
 import 'features/onboarding/screens/onboarding_screen.dart';
 import 'features/practice/screens/breathing_screen.dart';
 import 'features/practice/screens/practice_screen.dart';
@@ -16,6 +25,16 @@ import 'features/settings/screens/settings_screen.dart';
 import 'features/settings/screens/terms_screen.dart';
 import 'features/situations/screens/situations_screen.dart';
 import 'features/splash/screens/splash_screen.dart';
+
+/// Set to the live [GoRouter] whenever `_routerProvider` builds one, so a
+/// notification tap (which fires outside the widget tree, via a static
+/// callback in MotivationService) can still navigate.
+GoRouter? appRouter;
+
+/// Overridden in main.dart when the app was cold-started by tapping the
+/// daily reminder notification, so the router opens straight to Practice
+/// instead of the splash screen.
+final launchedFromNotificationProvider = Provider<bool>((ref) => false);
 
 CustomTransitionPage<void> _slideFadePage(LocalKey key, Widget child) {
   return CustomTransitionPage<void>(
@@ -39,8 +58,9 @@ CustomTransitionPage<void> _slideFadePage(LocalKey key, Widget child) {
 }
 
 final _routerProvider = Provider<GoRouter>((ref) {
+  final launchedFromNotification = ref.watch(launchedFromNotificationProvider);
   final router = GoRouter(
-    initialLocation: '/',
+    initialLocation: launchedFromNotification ? '/situations' : '/',
     routes: [
       GoRoute(
         path: '/',
@@ -93,11 +113,85 @@ final _routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final postId = state.pathParameters['postId']!;
           final post = state.extra as CommunityPost?;
+          final scrollToComments =
+              state.uri.queryParameters['scrollToComments'] == 'true';
           return _slideFadePage(
             state.pageKey,
-            PostDetailScreen(postId: postId, initialPost: post),
+            PostDetailScreen(
+              postId: postId,
+              initialPost: post,
+              scrollToComments: scrollToComments,
+            ),
           );
         },
+      ),
+      GoRoute(
+        path: '/community/search',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const SearchScreen()),
+      ),
+      GoRoute(
+        path: '/community/daily-post',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const DailyPostScreen()),
+      ),
+      GoRoute(
+        path: '/community/user/:userId',
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          return _slideFadePage(state.pageKey, UserProfileScreen(userId: userId));
+        },
+      ),
+      GoRoute(
+        path: '/community/user/:userId/connections',
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return _slideFadePage(
+            state.pageKey,
+            FollowListScreen(
+              userId: userId,
+              displayName: extra['displayName'] as String? ?? 'this user',
+              initialTab: extra['initialTab'] as int? ?? 0,
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/messages',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const MessagesScreen()),
+      ),
+      GoRoute(
+        path: '/messages/compose/:userId',
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final displayName = state.extra as String? ?? 'this user';
+          return _slideFadePage(
+            state.pageKey,
+            ThreadScreen(otherUserId: userId, otherDisplayName: displayName),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/messages/thread/:threadId',
+        pageBuilder: (context, state) {
+          final threadId = state.pathParameters['threadId']!;
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return _slideFadePage(
+            state.pageKey,
+            ThreadScreen(
+              threadId: threadId,
+              otherUserId: extra['otherUserId'] as String? ?? '',
+              otherDisplayName: extra['otherDisplayName'] as String? ?? 'Conversation',
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) =>
+            _slideFadePage(state.pageKey, const NotificationsScreen()),
       ),
       GoRoute(
         path: '/breathing',
@@ -116,7 +210,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
-  ref.onDispose(router.dispose);
+  appRouter = router;
+  ref.onDispose(() {
+    if (identical(appRouter, router)) appRouter = null;
+    router.dispose();
+  });
   return router;
 });
 
@@ -134,11 +232,12 @@ class CadenceApp extends ConsumerWidget {
       themeMode: ThemeMode.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => NewMessageBannerOverlay(child: child!),
     );
   }
 }
 
-class _AppShell extends StatelessWidget {
+class _AppShell extends ConsumerWidget {
   final Widget child;
   final GoRouterState state;
 
@@ -153,8 +252,12 @@ class _AppShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final index = _currentIndex(state.matchedLocation);
+    // Watched here (rather than only inside CommunityScreen) so the dot
+    // stays live app-wide, not just while the Community tab happens to be
+    // mounted — _AppShell persists across every shell tab.
+    final hasUnreadNotifications = ref.watch(unreadNotificationCountProvider) > 0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -191,6 +294,7 @@ class _AppShell extends StatelessWidget {
                   label: 'Community',
                   isActive: index == 1,
                   onTap: () => context.go('/community'),
+                  showBadge: hasUnreadNotifications,
                 ),
                 _NavItem(
                   icon: Icons.bar_chart,
@@ -218,12 +322,14 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final bool showBadge;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.isActive,
     required this.onTap,
+    this.showBadge = false,
   });
 
   // hPad is the horizontal padding on each side of the active pill content.
@@ -262,10 +368,35 @@ class _NavItem extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      icon,
-                      size: _iconSize,
-                      color: isActive ? Colors.white : const Color(0xFF9E9E9E),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          icon,
+                          size: _iconSize,
+                          color:
+                              isActive ? Colors.white : const Color(0xFF9E9E9E),
+                        ),
+                        if (showBadge)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.error,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isActive
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     // SizedBox has an explicit width derived from the slot, so
                     // the Row can never exceed (icon + gap + labelWidth) which

@@ -10,15 +10,18 @@ import '../models/community_post.dart';
 import '../models/community_reply.dart';
 import '../providers/community_provider.dart';
 import '../widgets/initial_avatar.dart';
+import '../widgets/situation_tag_chip.dart';
 
 class PostDetailScreen extends ConsumerStatefulWidget {
   final String postId;
   final CommunityPost? initialPost;
+  final bool scrollToComments;
 
   const PostDetailScreen({
     super.key,
     required this.postId,
     this.initialPost,
+    this.scrollToComments = false,
   });
 
   @override
@@ -28,12 +31,35 @@ class PostDetailScreen extends ConsumerStatefulWidget {
 class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   final _replyCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _commentsKey = GlobalKey();
+  bool _pendingScrollToComments = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pendingScrollToComments = widget.scrollToComments;
+  }
 
   @override
   void dispose() {
     _replyCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _maybeScrollToComments() {
+    if (!_pendingScrollToComments) return;
+    _pendingScrollToComments = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _commentsKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -57,13 +83,53 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     }
   }
 
+  Widget _buildPostSection(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    if (widget.initialPost != null) {
+      return _PostContent(post: widget.initialPost!, ref: ref);
+    }
+    // Reached without an in-memory post (e.g. from a notification, which
+    // only carries a postId) — fetch it directly rather than rendering
+    // nothing for this section.
+    final postAsync = ref.watch(postByIdProvider(widget.postId));
+    return postAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          'Could not load this post.',
+          style: GoogleFonts.figtree(
+              fontSize: 14, color: cs.onSurface.withValues(alpha: 0.4)),
+        ),
+      ),
+      data: (post) {
+        if (post == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              'This post is unavailable.',
+              style: GoogleFonts.figtree(
+                  fontSize: 14, color: cs.onSurface.withValues(alpha: 0.4)),
+            ),
+          );
+        }
+        return _PostContent(post: post, ref: ref);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final repliesAsync = ref.watch(postRepliesProvider(widget.postId));
     final isSubmitting = ref.watch(addReplyProvider) is AsyncLoading;
     final currentUser = ref.watch(currentUserProvider);
-    final post = widget.initialPost;
+    final post = widget.initialPost ??
+        ref.watch(postByIdProvider(widget.postId)).value;
+    _maybeScrollToComments();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -93,9 +159,10 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
                 children: [
-                  if (post != null) _PostContent(post: post, ref: ref),
+                  _buildPostSection(context, ref),
                   const SizedBox(height: 8),
                   Container(
+                    key: _commentsKey,
                     height: 1,
                     color: cs.outline.withValues(alpha: 0.45),
                   ),
@@ -137,6 +204,9 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                             .map((e) => _ReplyRow(
                                   reply: e.value,
                                   isLast: e.key == replies.length - 1,
+                                  canDelete: currentUser != null &&
+                                      (currentUser.id == e.value.userId ||
+                                          currentUser.id == post?.userId),
                                 ))
                             .toList(),
                       );
@@ -213,6 +283,10 @@ class _PostContent extends StatelessWidget {
                 ),
               ],
             ),
+            if (post.situationTag != null) ...[
+              const SizedBox(width: 8),
+              SituationTagChip(situationTag: post.situationTag),
+            ],
           ],
         ),
         const SizedBox(height: 14),
@@ -251,7 +325,7 @@ class _PostContent extends StatelessWidget {
                       key: ValueKey(isLiked),
                       size: 18,
                       color: isLiked
-                          ? AppColors.gold
+                          ? AppColors.like
                           : cs.onSurface.withValues(alpha: 0.35),
                     ),
                   ),
@@ -261,7 +335,7 @@ class _PostContent extends StatelessWidget {
                     style: GoogleFonts.figtree(
                       fontSize: 13,
                       color: isLiked
-                          ? AppColors.gold
+                          ? AppColors.like
                           : cs.onSurface.withValues(alpha: 0.45),
                     ),
                   ),
@@ -291,10 +365,15 @@ class _PostContent extends StatelessWidget {
 
 // ─── Reply row ────────────────────────────────────────────────────────────────
 
-class _ReplyRow extends StatelessWidget {
+class _ReplyRow extends ConsumerWidget {
   final CommunityReply reply;
   final bool isLast;
-  const _ReplyRow({required this.reply, required this.isLast});
+  final bool canDelete;
+  const _ReplyRow({
+    required this.reply,
+    required this.isLast,
+    required this.canDelete,
+  });
 
   String _relativeTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
@@ -305,66 +384,105 @@ class _ReplyRow extends StatelessWidget {
     return '${diff.inDays}d ago';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(
-                bottom: BorderSide(
-                    color: cs.outline.withValues(alpha: 0.5))),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InitialAvatar(name: reply.displayName, size: 26),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      reply.displayName,
-                      style: GoogleFonts.figtree(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text('·',
-                        style: GoogleFonts.figtree(
-                            fontSize: 12,
-                            color:
-                                cs.onSurface.withValues(alpha: 0.3))),
-                    const SizedBox(width: 6),
-                    Text(
-                      _relativeTime(reply.createdAt),
-                      style: GoogleFonts.figtree(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.35),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  reply.body,
-                  style: GoogleFonts.figtree(
-                    fontSize: 14,
-                    color: cs.onSurface,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete comment?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await ref.read(deleteCommentProvider.notifier).delete(reply.id);
+    if (ok) HapticFeedback.lightImpact();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onLongPress: canDelete ? () => _confirmDelete(context, ref) : null,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          border: isLast
+              ? null
+              : Border(
+                  bottom: BorderSide(
+                      color: cs.outline.withValues(alpha: 0.5))),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InitialAvatar(name: reply.displayName, size: 26),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        reply.displayName,
+                        style: GoogleFonts.figtree(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text('·',
+                          style: GoogleFonts.figtree(
+                              fontSize: 12,
+                              color:
+                                  cs.onSurface.withValues(alpha: 0.3))),
+                      const SizedBox(width: 6),
+                      Text(
+                        _relativeTime(reply.createdAt),
+                        style: GoogleFonts.figtree(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    reply.body,
+                    style: GoogleFonts.figtree(
+                      fontSize: 14,
+                      color: cs.onSurface,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (canDelete)
+              GestureDetector(
+                onTap: () => _confirmDelete(context, ref),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    Icons.more_horiz,
+                    size: 18,
+                    color: cs.onSurface.withValues(alpha: 0.3),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

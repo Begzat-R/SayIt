@@ -20,15 +20,33 @@ dependencies:
   path_provider: ^2.1.4
   uuid: ^4.5.1
   shared_preferences: ^2.3.3
+  flutter_local_notifications: ^19.4.2
+  timezone: ^0.10.1
+  permission_handler: ^11.3.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   build_runner: ^2.4.13
   riverpod_generator: ^2.6.1
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
     - assets/icons/
+
+flutter_launcher_icons:
+  image_path: "assets/icons/cadence_icon_launcher.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  windows:
+    generate: true
+  macos:
+    generate: true
+  web:
+    generate: true
+    background_color: "#F5F1E8"
+    theme_color: "#2A1B4E"

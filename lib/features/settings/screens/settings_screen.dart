@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/colors.dart';
 import '../../../services/auth_service.dart';
 import '../../community/models/community_post.dart';
+import '../../community/providers/follow_provider.dart';
 import '../../community/providers/profile_provider.dart';
 import '../../community/widgets/initial_avatar.dart';
+import '../providers/daily_reminder_provider.dart';
 
 const _kAppVersion = '1.0.0';
 
@@ -115,6 +118,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+
+            // ─── Daily reminder section ───────────────────────────────────
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
+              sliver: SliverToBoxAdapter(
+                child: _DailyReminderSection(cs: cs),
+              ),
+            ),
 
             // ─── About section ────────────────────────────────────────────
             SliverPadding(
@@ -274,27 +285,40 @@ class _AccountSection extends ConsumerWidget {
               ],
             ),
 
+            if (!editing) ...[
+              const SizedBox(height: 10),
+              _FollowCountsRow(userId: user.id, displayName: effectiveName),
+            ],
+
             // Save/Cancel (editing only)
             if (editing) ...[
               const SizedBox(height: 14),
               Row(
                 children: [
-                  SizedBox(
-                    height: 40,
-                    child: ElevatedButton(
-                      onPressed: isSaving ? null : () => onSave(user.id),
-                      child: isSaving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : Text('Save',
-                              style: GoogleFonts.figtree(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600)),
+                  ElevatedButton(
+                    onPressed: isSaving ? null : () => onSave(user.id),
+                    // The app-wide ElevatedButtonTheme sets minimumSize:
+                    // Size(double.infinity, 52) — fine for full-width
+                    // buttons, but bare in a Row (as here, next to
+                    // Cancel) that infinite width has nothing to resolve
+                    // against and crashes layout with no on-screen error.
+                    // Same class of bug as the profile screen's Message
+                    // button and the message-request Accept button.
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text('Save',
+                            style: GoogleFonts.figtree(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
@@ -329,6 +353,182 @@ class _AccountSection extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _FollowCountsRow extends ConsumerWidget {
+  final String userId;
+  final String displayName;
+  const _FollowCountsRow({required this.userId, required this.displayName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final followerCount = ref.watch(followerCountProvider(userId));
+    final followingCount = ref.watch(followingCountProvider(userId));
+
+    Widget count(String label, int? value, int initialTab) {
+      return GestureDetector(
+        onTap: () => context.push(
+          '/community/user/$userId/connections',
+          extra: {'displayName': displayName, 'initialTab': initialTab},
+        ),
+        child: Text(
+          '${value ?? 0} $label',
+          style: GoogleFonts.figtree(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.5)),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        count('followers', followerCount.value, 0),
+        const SizedBox(width: 14),
+        count('following', followingCount.value, 1),
+      ],
+    );
+  }
+}
+
+// ─── Daily reminder section ──────────────────────────────────────────────────
+
+class _DailyReminderSection extends ConsumerWidget {
+  final ColorScheme cs;
+  const _DailyReminderSection({required this.cs});
+
+  Future<void> _pickTime(
+    BuildContext context,
+    WidgetRef ref,
+    TimeOfDay current,
+  ) async {
+    final picked = await showTimePicker(context: context, initialTime: current);
+    if (picked != null) {
+      await ref.read(dailyReminderProvider.notifier).setTime(picked);
+    }
+  }
+
+  String _formatTime(TimeOfDay t) {
+    final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final minute = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(dailyReminderProvider);
+    final notifier = ref.read(dailyReminderProvider.notifier);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(height: 1, color: cs.outline.withValues(alpha: 0.6)),
+        const SizedBox(height: 20),
+        Text(
+          'DAILY REMINDER',
+          style: GoogleFonts.figtree(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface.withValues(alpha: 0.35),
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: cs.outline.withValues(alpha: 0.5)),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Daily reminder',
+                  style: GoogleFonts.figtree(fontSize: 14, color: cs.onSurface),
+                ),
+              ),
+              if (state.loading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Switch.adaptive(
+                  value: state.enabled,
+                  activeThumbColor: AppColors.primary,
+                  onChanged: (value) => notifier.setEnabled(value),
+                ),
+            ],
+          ),
+        ),
+        if (state.enabled)
+          GestureDetector(
+            onTap: () => _pickTime(context, ref, state.time),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: cs.outline.withValues(alpha: 0.5)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Time',
+                      style: GoogleFonts.figtree(
+                          fontSize: 14, color: cs.onSurface),
+                    ),
+                  ),
+                  Text(
+                    _formatTime(state.time),
+                    style: GoogleFonts.figtree(
+                      fontSize: 14,
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: cs.onSurface.withValues(alpha: 0.3),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (state.permissionDeniedMessage != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            state.permissionDeniedMessage!,
+            style: GoogleFonts.figtree(
+              fontSize: 13,
+              color: cs.onSurface.withValues(alpha: 0.55),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () {
+              notifier.dismissPermissionMessage();
+              openAppSettings();
+            },
+            child: Text(
+              'Open app settings',
+              style: GoogleFonts.figtree(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

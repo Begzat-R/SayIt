@@ -30,7 +30,7 @@ final myPostsProvider =
   final rows = await _db
       .from('community_posts')
       .select(
-        'id, user_id, body, created_at, '
+        'id, user_id, body, created_at, situation_tag, '
         'profiles(display_name), '
         'post_likes(user_id), '
         'community_replies(id)',
@@ -41,6 +41,40 @@ final myPostsProvider =
       .map((r) => CommunityPost.fromJson(
             r as Map<String, dynamic>,
             currentUserId: user.id,
+          ))
+      .toList();
+});
+
+// ─── Another user's public profile ───────────────────────────────────────────
+
+final publicProfileProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>?, String>(
+        (ref, userId) async {
+  return await _db
+      .from('profiles')
+      .select('id, display_name, created_at')
+      .eq('id', userId)
+      .maybeSingle();
+});
+
+final userPostsProvider =
+    FutureProvider.autoDispose.family<List<CommunityPost>, String>(
+        (ref, userId) async {
+  final currentUserId = ref.watch(currentUserProvider)?.id;
+  final rows = await _db
+      .from('community_posts')
+      .select(
+        'id, user_id, body, created_at, situation_tag, '
+        'profiles(display_name), '
+        'post_likes(user_id), '
+        'community_replies(id)',
+      )
+      .eq('user_id', userId)
+      .order('created_at', ascending: false);
+  return (rows as List)
+      .map((r) => CommunityPost.fromJson(
+            r as Map<String, dynamic>,
+            currentUserId: currentUserId,
           ))
       .toList();
 });
