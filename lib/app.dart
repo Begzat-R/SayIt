@@ -20,9 +20,7 @@ import 'features/onboarding/screens/onboarding_screen.dart';
 import 'features/practice/screens/breathing_screen.dart';
 import 'features/practice/screens/practice_screen.dart';
 import 'features/progress/screens/progress_screen.dart';
-import 'features/settings/screens/privacy_screen.dart';
 import 'features/settings/screens/settings_screen.dart';
-import 'features/settings/screens/terms_screen.dart';
 import 'features/situations/screens/situations_screen.dart';
 import 'features/splash/screens/splash_screen.dart';
 
@@ -197,16 +195,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
         path: '/breathing',
         pageBuilder: (context, state) =>
             _slideFadePage(state.pageKey, const BreathingScreen()),
-      ),
-      GoRoute(
-        path: '/terms',
-        pageBuilder: (context, state) =>
-            _slideFadePage(state.pageKey, const TermsScreen()),
-      ),
-      GoRoute(
-        path: '/privacy',
-        pageBuilder: (context, state) =>
-            _slideFadePage(state.pageKey, const PrivacyScreen()),
       ),
     ],
   );

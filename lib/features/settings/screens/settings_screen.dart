@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/colors.dart';
 import '../../../services/auth_service.dart';
@@ -13,6 +14,18 @@ import '../../community/widgets/initial_avatar.dart';
 import '../providers/daily_reminder_provider.dart';
 
 const _kAppVersion = '1.0.0';
+const _kTermsUrl = 'https://claude.ai/artifact/GF2przsYCRLZKXD1c4eaQk';
+const _kPrivacyUrl = 'https://claude.ai/artifact/7VrfN4J2evQJFJXAzLgAJZ';
+
+Future<void> _openExternalLink(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open link.')),
+    );
+  }
+}
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -558,12 +571,12 @@ class _AboutSection extends StatelessWidget {
         const SizedBox(height: 8),
         _SettingsRow(
           label: 'Terms of Service',
-          onTap: () => context.push('/terms'),
+          onTap: () => _openExternalLink(context, _kTermsUrl),
           showChevron: true,
         ),
         _SettingsRow(
           label: 'Privacy Policy',
-          onTap: () => context.push('/privacy'),
+          onTap: () => _openExternalLink(context, _kPrivacyUrl),
           showChevron: true,
         ),
         _SettingsRow(
