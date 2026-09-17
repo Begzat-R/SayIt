@@ -14,8 +14,8 @@ import '../../community/widgets/initial_avatar.dart';
 import '../providers/daily_reminder_provider.dart';
 
 const _kAppVersion = '1.0.0';
-const _kTermsUrl = 'https://claude.ai/artifact/GF2przsYCRLZKXD1c4eaQk';
-const _kPrivacyUrl = 'https://claude.ai/artifact/7VrfN4J2evQJFJXAzLgAJZ';
+const _kTermsUrl = 'https://begzat-r.github.io/SayIt/terms.html';
+const _kPrivacyUrl = 'https://begzat-r.github.io/SayIt/privacy.html';
 
 Future<void> _openExternalLink(BuildContext context, String url) async {
   final uri = Uri.parse(url);
@@ -415,7 +415,22 @@ class _DailyReminderSection extends ConsumerWidget {
     WidgetRef ref,
     TimeOfDay current,
   ) async {
-    final picked = await showTimePicker(context: context, initialTime: current);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current,
+      // Force a 12-hour AM/PM picker regardless of the device's system
+      // time format setting, so the user can always explicitly choose
+      // AM vs PM here. This only changes how the picker displays the
+      // value — TimeOfDay.hour (and everything scheduleDaily/_nextInstanceOfTime
+      // do with it in motivation_service.dart) is always 24-hour internally,
+      // so this can't shift what time actually gets scheduled.
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
     if (picked != null) {
       await ref.read(dailyReminderProvider.notifier).setTime(picked);
     }

@@ -6,7 +6,15 @@
     <application
         android:label="cadence"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
+        <!-- Explicitly disabled: Android's default Auto Backup (allowBackup
+             defaults to true) can silently restore this app's SharedPreferences
+             — including onboarding_complete — from the user's Google account on
+             a Play-Store-driven reinstall, making a "fresh install" not actually
+             fresh. adb sideloads never trigger that restore path, so this can't
+             be caught by local device testing alone. -->
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
