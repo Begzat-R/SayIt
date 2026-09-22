@@ -11,7 +11,7 @@ import '../providers/messages_provider.dart';
 /// Wraps the entire app (installed via `MaterialApp.router`'s `builder`) so
 /// an incoming-message banner can show over *any* screen. Most pushed
 /// routes (post detail, a profile, settings) live outside the bottom-tab
-/// ShellRoute, so a listener placed inside one screen wouldn't fire while
+/// shell, so a listener placed inside one screen wouldn't fire while
 /// looking at another — this sits above the Navigator instead.
 class NewMessageBannerOverlay extends ConsumerStatefulWidget {
   final Widget child;

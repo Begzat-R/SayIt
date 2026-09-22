@@ -156,22 +156,18 @@ class _DailyPostScreenState extends ConsumerState<DailyPostScreen> {
                 }).toList(),
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : _submit,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : Text('Share',
-                          style: GoogleFonts.figtree(
-                              fontSize: 15, fontWeight: FontWeight.w600)),
-                ),
+              ElevatedButton(
+                onPressed: isLoading ? null : _submit,
+                child: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text('Share',
+                        style: GoogleFonts.figtree(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ],
           ),

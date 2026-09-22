@@ -12,7 +12,9 @@ import '../../messages/providers/messages_provider.dart';
 import '../../notifications/providers/notifications_provider.dart';
 import '../models/community_post.dart';
 import '../providers/community_provider.dart';
+import '../widgets/circle_icon_button.dart';
 import '../widgets/initial_avatar.dart';
+import '../widgets/pill_tab_bar.dart';
 import '../widgets/situation_tag_chip.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,83 +114,38 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Text(
-                      'Community',
-                      style: GoogleFonts.epilogue(
-                        fontSize: 40,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                        letterSpacing: -0.5,
-                        height: 1.1,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Community',
+                        style: GoogleFonts.epilogue(
+                          fontSize: 40,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
                       ),
                     ),
                   ),
-                  GestureDetector(
+                  CircleIconButton(
+                    icon: Icons.search,
                     onTap: () => context.push('/community/search'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(Icons.search, size: 22, color: cs.onSurface.withValues(alpha: 0.7)),
-                    ),
                   ),
-                  GestureDetector(
+                  const SizedBox(width: 10),
+                  CircleIconButton(
+                    icon: Icons.mail_outline_rounded,
                     onTap: () => context.push('/messages'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(Icons.mail_outline_rounded,
-                              size: 22, color: cs.onSurface.withValues(alpha: 0.7)),
-                          if (ref.watch(unreadThreadCountProvider) > 0)
-                            Positioned(
-                              right: -1,
-                              top: -1,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: AppColors.error,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Theme.of(context).scaffoldBackgroundColor,
-                                      width: 1.5),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                    showBadge: ref.watch(unreadThreadCountProvider) > 0,
                   ),
-                  GestureDetector(
+                  const SizedBox(width: 10),
+                  CircleIconButton(
+                    icon: Icons.notifications_none_rounded,
                     onTap: () => context.push('/notifications'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(Icons.notifications_none_rounded,
-                              size: 22, color: cs.onSurface.withValues(alpha: 0.7)),
-                          if (ref.watch(unreadNotificationCountProvider) > 0)
-                            Positioned(
-                              right: -1,
-                              top: -1,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: AppColors.error,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Theme.of(context).scaffoldBackgroundColor,
-                                      width: 1.5),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                    showBadge: ref.watch(unreadNotificationCountProvider) > 0,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () => context.go('/settings'),
                     child:
@@ -196,6 +153,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: PillTabBar(labels: ['Trending', 'Following', 'New']),
             ),
             const SizedBox(height: 16),
             Padding(
@@ -206,13 +168,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.edit_note_rounded, size: 22, color: AppColors.primary),
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.auto_awesome_rounded,
+                            size: 18, color: Colors.white),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -222,8 +192,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                               'What did you try today?',
                               style: GoogleFonts.figtree(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: cs.onSurface,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -231,39 +201,20 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                               'Share a moment, tag the situation.',
                               style: GoogleFonts.figtree(
                                 fontSize: 12,
-                                color: cs.onSurface.withValues(alpha: 0.5),
+                                color: Colors.white.withValues(alpha: 0.75),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+                      const Icon(Icons.arrow_forward_rounded,
+                          size: 18, color: Colors.white),
                     ],
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TabBar(
-                tabs: const [
-                  Tab(text: 'Trending'),
-                  Tab(text: 'Following'),
-                  Tab(text: 'New'),
-                ],
-                labelStyle: GoogleFonts.figtree(
-                    fontSize: 13, fontWeight: FontWeight.w600),
-                unselectedLabelStyle: GoogleFonts.figtree(
-                    fontSize: 13, fontWeight: FontWeight.w400),
-                labelColor: cs.onSurface,
-                unselectedLabelColor: cs.onSurface.withValues(alpha: 0.4),
-                indicatorColor: AppColors.primary,
-                indicatorSize: TabBarIndicatorSize.label,
-                dividerColor: cs.outline.withValues(alpha: 0.4),
-                dividerHeight: 1,
-              ),
-            ),
             Expanded(
               child: TabBarView(
                 children: [
@@ -381,26 +332,22 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       ),
                     ],
                     const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: authState.isLoading ? null : _submit,
-                        child: authState.isLoading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(
-                                isSignIn ? 'Sign in' : 'Create account',
-                                style: GoogleFonts.figtree(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    ElevatedButton(
+                      onPressed: authState.isLoading ? null : _submit,
+                      child: authState.isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              isSignIn ? 'Sign in' : 'Create account',
+                              style: GoogleFonts.figtree(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
                               ),
-                      ),
+                            ),
                     ),
                     const SizedBox(height: 20),
                     Center(
@@ -444,39 +391,37 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton(
-                        onPressed:
-                            authState.isLoading ? null : _signInWithGoogle,
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                              color: cs.onSurface.withValues(alpha: 0.25)),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(6)),
-                          ),
-                          foregroundColor: cs.onSurface,
+                    OutlinedButton(
+                      onPressed:
+                          authState.isLoading ? null : _signInWithGoogle,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                            color: cs.onSurface.withValues(alpha: 0.25)),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CustomPaint(
-                              size: const Size(18, 18),
-                              painter: const _GoogleGPainter(),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
+                        foregroundColor: cs.onSurface,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CustomPaint(
+                            size: const Size(18, 18),
+                            painter: const _GoogleGPainter(),
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
                               'Continue with Google',
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.figtree(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
                                 color: cs.onSurface,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -562,7 +507,7 @@ class _PostsFeed extends ConsumerWidget {
 
     return postsAsync.when(
       loading: () => ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 100),
         itemCount: 4,
         itemBuilder: (context, _) => const _PostCardSkeleton(),
       ),
@@ -590,7 +535,15 @@ class _PostsFeed extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          // 140 (up from 100) so the compose FAB clears the last card's
+          // text once the feed has enough posts to actually scroll near
+          // its end — the realistic case for an active feed. Note this
+          // padding is inert for a very short feed that doesn't fill the
+          // viewport (nothing to scroll means it never gets "used"), so a
+          // near-empty feed can still show the same overlap; fixing that
+          // edge case too would need the FAB or cards to react to content
+          // height, which felt like overkill for a handful of seed posts.
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
           itemCount: sorted.length,
           itemBuilder: (context, index) => _PostCard(post: sorted[index]),
         );
@@ -611,7 +564,7 @@ class _FollowingFeed extends ConsumerWidget {
 
     return postsAsync.when(
       loading: () => ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 100),
         itemCount: 3,
         itemBuilder: (context, _) => const _PostCardSkeleton(),
       ),
@@ -653,7 +606,7 @@ class _FollowingFeed extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
           itemCount: posts.length,
           itemBuilder: (context, index) => _PostCard(post: posts[index]),
         );
@@ -690,21 +643,16 @@ class _PostCard extends ConsumerWidget {
       onTap: () => context.push('/post/${post.id}', extra: post),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.cardSurface(context),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 2),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -725,6 +673,8 @@ class _PostCard extends ConsumerWidget {
                       children: [
                         Text(
                           post.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.figtree(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -733,6 +683,8 @@ class _PostCard extends ConsumerWidget {
                         ),
                         Text(
                           _relativeTime(post.createdAt),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.figtree(
                             fontSize: 11,
                             color: cs.onSurface.withValues(alpha: 0.35),
@@ -741,8 +693,12 @@ class _PostCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (post.situationTag != null)
-                    SituationTagChip(situationTag: post.situationTag),
+                  if (post.situationTag != null) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: SituationTagChip(situationTag: post.situationTag),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -758,8 +714,8 @@ class _PostCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             // Divider
-            Container(height: 1, color: cs.outline.withValues(alpha: 0.45)),
-            const SizedBox(height: 10),
+            Container(height: 1, color: cs.onSurface.withValues(alpha: 0.08)),
+            const SizedBox(height: 12),
             // Engagement row
             Row(
               children: [
@@ -776,57 +732,79 @@ class _PostCard extends ConsumerWidget {
                                 userId: currentUser.id,
                               );
                         },
-                  child: Row(
-                    children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: Icon(
-                          isLiked
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_outline_rounded,
-                          key: ValueKey(isLiked),
-                          size: 17,
-                          color: isLiked
-                              ? AppColors.like
-                              : cs.onSurface.withValues(alpha: 0.35),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isLiked
+                          ? AppColors.like.withValues(alpha: 0.12)
+                          : cs.onSurface.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: Icon(
+                            isLiked
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_outline_rounded,
+                            key: ValueKey(isLiked),
+                            size: 15,
+                            color: isLiked
+                                ? AppColors.like
+                                : cs.onSurface.withValues(alpha: 0.5),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$likeCount',
-                        style: GoogleFonts.figtree(
-                          fontSize: 13,
-                          color: isLiked
-                              ? AppColors.like
-                              : cs.onSurface.withValues(alpha: 0.45),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$likeCount',
+                          style: GoogleFonts.figtree(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isLiked
+                                ? AppColors.like
+                                : cs.onSurface.withValues(alpha: 0.55),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 18),
+                const SizedBox(width: 10),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => context.push(
                     '/post/${post.id}?scrollToComments=true',
                     extra: post,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 16,
-                        color: cs.onSurface.withValues(alpha: 0.35),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${post.commentCount}',
-                        style: GoogleFonts.figtree(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.45),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 14,
+                          color: cs.onSurface.withValues(alpha: 0.5),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 5),
+                        Text(
+                          '${post.commentCount}',
+                          style: GoogleFonts.figtree(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -877,16 +855,16 @@ class _PostCardSkeletonState extends State<_PostCardSkeleton>
         final opacity = 0.04 + _anim.value * 0.06;
         final shimmer = cs.onSurface.withValues(alpha: opacity);
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 14),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.cardSurface(context),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -1018,21 +996,17 @@ class _NewPostSheetState extends ConsumerState<_NewPostSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: isLoading ? null : _submit,
-              child: isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : Text('Post',
-                      style: GoogleFonts.figtree(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
-            ),
+          ElevatedButton(
+            onPressed: isLoading ? null : _submit,
+            child: isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : Text('Post',
+                    style: GoogleFonts.figtree(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

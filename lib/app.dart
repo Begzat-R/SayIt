@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/colors.dart';
 import 'core/theme/theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'features/community/models/community_post.dart';
 import 'features/community/screens/community_screen.dart';
 import 'features/community/screens/daily_post_screen.dart';
@@ -70,30 +71,41 @@ final _routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) =>
             _slideFadePage(state.pageKey, const OnboardingScreen()),
       ),
-      ShellRoute(
-        builder: (context, state, child) =>
-            _AppShell(state: state, child: child),
-        routes: [
-          GoRoute(
-            path: '/situations',
-            pageBuilder: (context, state) =>
-                _slideFadePage(state.pageKey, const SituationsScreen()),
-          ),
-          GoRoute(
-            path: '/community',
-            pageBuilder: (context, state) =>
-                _slideFadePage(state.pageKey, const CommunityScreen()),
-          ),
-          GoRoute(
-            path: '/progress',
-            pageBuilder: (context, state) =>
-                _slideFadePage(state.pageKey, const ProgressScreen()),
-          ),
-          GoRoute(
-            path: '/settings',
-            pageBuilder: (context, state) =>
-                _slideFadePage(state.pageKey, const SettingsScreen()),
-          ),
+      // StatefulShellRoute.indexedStack keeps all four tab screens alive in
+      // an IndexedStack instead of disposing and rebuilding the destination
+      // screen on every tab switch. The previous plain ShellRoute rebuilt
+      // (and, for Community, re-fetched over the network) the whole screen
+      // on every switch while also playing a 300ms transition on top of
+      // that rebuild — measured as real jank (dropped frames) even in
+      // profile builds. Switching branches is now an instant index change.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            _AppShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/situations',
+              builder: (context, state) => const SituationsScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/community',
+              builder: (context, state) => const CommunityScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/progress',
+              builder: (context, state) => const ProgressScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/settings',
+              builder: (context, state) => const SettingsScreen(),
+            ),
+          ]),
         ],
       ),
       GoRoute(
@@ -212,12 +224,13 @@ class CadenceApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(_routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Cadence',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.light,
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) => NewMessageBannerOverlay(child: child!),
@@ -226,22 +239,22 @@ class CadenceApp extends ConsumerWidget {
 }
 
 class _AppShell extends ConsumerWidget {
-  final Widget child;
-  final GoRouterState state;
+  final StatefulNavigationShell navigationShell;
 
-  const _AppShell({required this.child, required this.state});
+  const _AppShell({required this.navigationShell});
 
-  int _currentIndex(String location) {
-    if (location.startsWith('/situations')) return 0;
-    if (location.startsWith('/community')) return 1;
-    if (location.startsWith('/progress')) return 2;
-    if (location.startsWith('/settings')) return 3;
-    return 0;
+  // initialLocation resets the branch's own navigation stack when the
+  // already-active tab is tapped again, matching typical bottom-nav UX.
+  void _goBranch(int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final index = _currentIndex(state.matchedLocation);
+    final index = navigationShell.currentIndex;
     // Watched here (rather than only inside CommunityScreen) so the dot
     // stays live app-wide, not just while the Community tab happens to be
     // mounted — _AppShell persists across every shell tab.
@@ -251,7 +264,7 @@ class _AppShell extends ConsumerWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
-        child: child,
+        child: navigationShell,
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -259,7 +272,7 @@ class _AppShell extends ConsumerWidget {
           child: Container(
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.cardSurface(context),
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
@@ -269,34 +282,43 @@ class _AppShell extends ConsumerWidget {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                _NavItem(
-                  icon: Icons.bolt_outlined,
-                  label: 'Practice',
-                  isActive: index == 0,
-                  onTap: () => context.go('/situations'),
-                ),
-                _NavItem(
-                  icon: Icons.group_outlined,
-                  label: 'Community',
-                  isActive: index == 1,
-                  onTap: () => context.go('/community'),
-                  showBadge: hasUnreadNotifications,
-                ),
-                _NavItem(
-                  icon: Icons.bar_chart,
-                  label: 'Progress',
-                  isActive: index == 2,
-                  onTap: () => context.go('/progress'),
-                ),
-                _NavItem(
-                  icon: Icons.person_outline,
-                  label: 'Profile',
-                  isActive: index == 3,
-                  onTap: () => context.go('/settings'),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, navConstraints) {
+                final totalWidth = navConstraints.maxWidth;
+                return Row(
+                  children: [
+                    _NavItem(
+                      totalWidth: totalWidth,
+                      icon: Icons.bolt_outlined,
+                      label: 'Practice',
+                      isActive: index == 0,
+                      onTap: () => _goBranch(0),
+                    ),
+                    _NavItem(
+                      totalWidth: totalWidth,
+                      icon: Icons.group_outlined,
+                      label: 'Community',
+                      isActive: index == 1,
+                      onTap: () => _goBranch(1),
+                      showBadge: hasUnreadNotifications,
+                    ),
+                    _NavItem(
+                      totalWidth: totalWidth,
+                      icon: Icons.bar_chart,
+                      label: 'Progress',
+                      isActive: index == 2,
+                      onTap: () => _goBranch(2),
+                    ),
+                    _NavItem(
+                      totalWidth: totalWidth,
+                      icon: Icons.person_outline,
+                      label: 'Profile',
+                      isActive: index == 3,
+                      onTap: () => _goBranch(3),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -306,6 +328,7 @@ class _AppShell extends ConsumerWidget {
 }
 
 class _NavItem extends StatelessWidget {
+  final double totalWidth;
   final IconData icon;
   final String label;
   final bool isActive;
@@ -313,6 +336,7 @@ class _NavItem extends StatelessWidget {
   final bool showBadge;
 
   const _NavItem({
+    required this.totalWidth,
     required this.icon,
     required this.label,
     required this.isActive,
@@ -327,18 +351,39 @@ class _NavItem extends StatelessWidget {
   static const double _iconSize = 20.0;
   static const double _gap = 6.0;
 
+  // The active tab is the only one that needs room for a label, so it gets
+  // a bigger share of the row than the three icon-only tabs (2 parts out of
+  // 5, vs. 1 each) — with equal shares all round, the label's slot was only
+  // ever a flat quarter of the bar width and truncated to "Practi…" /
+  // "Communi…" on anything narrower than a phablet. Exactly one of the 4
+  // tabs is active at a time, so the total is always 2+1+1+1 = 5.
+  static const double _totalShares = 5.0;
+
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final slotWidth = constraints.maxWidth;
-          // Available width for the label after padding, icon, and gap are accounted for.
-          final labelWidth = isActive
-              ? (slotWidth - 2 * _hPad - _iconSize - _gap).clamp(0.0, double.infinity)
-              : 0.0;
+    final targetSlotWidth = (isActive ? 2 : 1) / _totalShares * totalWidth;
 
-          return GestureDetector(
+    // Previously the slot width came from Expanded(flex: isActive ? 2 : 1),
+    // which snaps instantly on tab switch, while the label's width shrank
+    // via a separate AnimatedSize over 220ms — the two were driven by
+    // different clocks, so mid-transition the Row still demanded its old
+    // (wide) width inside an already-narrowed slot and threw a RenderFlex
+    // overflow ("red flash") on every switch. Driving both the slot width
+    // and the label width from this single TweenAnimationBuilder value
+    // keeps them in lockstep on every frame, not just at rest.
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: targetSlotWidth, end: targetSlotWidth),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOutCubic,
+      builder: (context, slotWidth, child) {
+        // Available width for the label after padding, icon, and gap are accounted for.
+        final labelWidth = isActive
+            ? (slotWidth - 2 * _hPad - _iconSize - _gap).clamp(0.0, double.infinity)
+            : 0.0;
+
+        return SizedBox(
+          width: slotWidth,
+          child: GestureDetector(
             onTap: onTap,
             behavior: HitTestBehavior.opaque,
             child: Center(
@@ -386,38 +431,44 @@ class _NavItem extends StatelessWidget {
                           ),
                       ],
                     ),
-                    // SizedBox has an explicit width derived from the slot, so
-                    // the Row can never exceed (icon + gap + labelWidth) which
-                    // equals exactly slotWidth - 2*_hPad. No overflow possible.
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeInOutCubic,
-                      child: SizedBox(
-                        width: labelWidth > 0 ? labelWidth + _gap : 0,
-                        child: isActive
-                            ? Padding(
-                                padding: const EdgeInsets.only(left: _gap),
+                    // Width comes from the same slotWidth as the SizedBox
+                    // above, computed in the same builder call, so the Row
+                    // can never exceed (icon + gap + labelWidth) — which
+                    // equals exactly slotWidth - 2*_hPad — at any point
+                    // during the animation, not just once it settles.
+                    SizedBox(
+                      width: labelWidth > 0 ? labelWidth + _gap : 0,
+                      child: isActive
+                          ? Padding(
+                              padding: const EdgeInsets.only(left: _gap),
+                              // FittedBox is the last-resort safety net: on
+                              // a very narrow phone combined with a large
+                              // system font size, even the rebalanced slot
+                              // above can run out of room — this shrinks
+                              // the label instead of clipping it.
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
                                 child: Text(
                                   label,
                                   maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.figtree(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
                                   ),
                                 ),
-                              )
-                            : null,
-                      ),
+                              ),
+                            )
+                          : null,
                     ),
                   ],
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

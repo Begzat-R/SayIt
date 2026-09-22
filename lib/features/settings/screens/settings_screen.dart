@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../services/auth_service.dart';
 import '../../community/models/community_post.dart';
 import '../../community/providers/follow_provider.dart';
@@ -140,6 +141,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
 
+            // ─── Appearance section ───────────────────────────────────────
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
+              sliver: SliverToBoxAdapter(
+                child: _AppearanceSection(cs: cs),
+              ),
+            ),
+
             // ─── About section ────────────────────────────────────────────
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
@@ -214,10 +223,33 @@ class _AccountSection extends ConsumerWidget {
         height: 72,
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ),
-      error: (e, _) => Text(
-        'Could not load profile.',
-        style: GoogleFonts.figtree(
-            fontSize: 14, color: cs.onSurface.withValues(alpha: 0.4)),
+      // myProfileProvider is autoDispose, but the bottom-tab shell keeps
+      // this screen mounted (just offstage) via IndexedStack so tab
+      // switches don't rebuild it — so a fetch that failed once (e.g. a
+      // transient network blip) never gets a second attempt on its own,
+      // and this stayed stuck on the error text for the rest of the
+      // session even after connectivity came back. A manual retry is the
+      // only way out short of restarting the app.
+      error: (e, _) => GestureDetector(
+        onTap: () => widgetRef.invalidate(myProfileProvider),
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          children: [
+            Text(
+              'Could not load profile. ',
+              style: GoogleFonts.figtree(
+                  fontSize: 14, color: cs.onSurface.withValues(alpha: 0.4)),
+            ),
+            Text(
+              'Tap to retry',
+              style: GoogleFonts.figtree(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
       ),
       data: (profile) {
         final displayName = profile?['display_name'] as String? ?? '';
@@ -556,6 +588,83 @@ class _DailyReminderSection extends ConsumerWidget {
             ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+// ─── Appearance section ──────────────────────────────────────────────────────
+
+class _AppearanceSection extends ConsumerWidget {
+  final ColorScheme cs;
+  const _AppearanceSection({required this.cs});
+
+  static const _options = [
+    (ThemeMode.system, 'System'),
+    (ThemeMode.light, 'Light'),
+    (ThemeMode.dark, 'Dark'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(height: 1, color: cs.outline.withValues(alpha: 0.6)),
+        const SizedBox(height: 20),
+        Text(
+          'APPEARANCE',
+          style: GoogleFonts.figtree(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface.withValues(alpha: 0.35),
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            border: Border.all(color: cs.outline.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              for (final (mode, label) in _options)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () =>
+                        ref.read(themeModeProvider.notifier).setThemeMode(mode),
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: mode == current
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        label,
+                        style: GoogleFonts.figtree(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: mode == current
+                              ? Colors.white
+                              : cs.onSurface.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }

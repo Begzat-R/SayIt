@@ -142,6 +142,12 @@ class _BreathingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Same bug the category pill had: AppColors.primary is a near-black
+    // indigo tuned to read as text on the light background — hardcoded
+    // here for the tint/icons, it left this banner nearly indistinguishable
+    // from the dark theme's near-black scaffold. primaryAccent() swaps in
+    // a lighter dark-mode variant, same as categoryColor's Social case.
+    final accent = AppColors.primaryAccent(context);
     return PressTrigger(
       scaleTo: 0.98,
       duration: const Duration(milliseconds: 100),
@@ -151,7 +157,7 @@ class _BreathingCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.05),
+            color: accent.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -159,7 +165,7 @@ class _BreathingCard extends StatelessWidget {
               Icon(
                 Icons.air,
                 size: 17,
-                color: AppColors.primary.withValues(alpha: 0.55),
+                color: accent.withValues(alpha: 0.75),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -176,7 +182,7 @@ class _BreathingCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward,
                 size: 14,
-                color: AppColors.primary.withValues(alpha: 0.4),
+                color: accent.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -223,6 +229,7 @@ class _ScenarioItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final categoryColor = AppColors.categoryColor(context, scenario.category);
 
     return PressTrigger(
       scaleTo: 0.98,
@@ -272,12 +279,21 @@ class _ScenarioItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Category pill
+                    // Category pill. Every category used AppColors.primary
+                    // regardless of its actual category, at reduced text
+                    // alpha on top of that — fine as a dark navy-on-cream
+                    // tint in light mode, but primary is a near-black hue:
+                    // at 60% alpha over the dark theme's near-black
+                    // background it's close to invisible (~1.4:1 measured
+                    // contrast, vs. the 4.5:1 AA floor). categoryColor()
+                    // picks a per-category, theme-correct foreground (same
+                    // mapping SituationTagChip uses) at full opacity
+                    // against a light tint instead.
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.07),
+                        color: categoryColor.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -285,7 +301,7 @@ class _ScenarioItem extends StatelessWidget {
                         style: GoogleFonts.figtree(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primary.withValues(alpha: 0.6),
+                          color: categoryColor,
                           letterSpacing: 0.8,
                         ),
                       ),

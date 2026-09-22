@@ -24,18 +24,23 @@ class SituationTagChip extends StatelessWidget {
     }
     if (scenario == null) return const SizedBox.shrink();
 
+    final color = AppColors.categoryColor(context, scenario.category);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.16),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         scenario.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
         style: GoogleFonts.figtree(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: AppColors.gold,
+          color: color,
         ),
       ),
     );

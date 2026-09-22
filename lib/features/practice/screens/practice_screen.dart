@@ -26,6 +26,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
   String? _recordingPath;
   bool _isDone = false;
+  // Guards against a second tap firing while start/stop is still in
+  // flight — without this, a tap that lands while stopRecording() is
+  // awaiting could read the still-true isRecording state and call
+  // startRecording() again, racing the in-progress stop.
+  bool _toggling = false;
 
   @override
   void initState() {
@@ -55,25 +60,31 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
   }
 
   Future<void> _toggleRecording() async {
-    final audioService = ref.read(audioServiceProvider.notifier);
-    final audioState = ref.read(audioServiceProvider);
+    if (_toggling) return;
+    _toggling = true;
+    try {
+      final audioService = ref.read(audioServiceProvider.notifier);
+      final audioState = ref.read(audioServiceProvider);
 
-    if (audioState.isRecording) {
-      final path = await audioService.stopRecording();
-      _pulseController.stop();
-      _pulseController.value = 0;
-      HapticFeedback.lightImpact();
-      setState(() {
-        _recordingPath = path;
-        _isDone = true;
-      });
-    } else {
-      setState(() {
-        _isDone = false;
-        _recordingPath = null;
-      });
-      await audioService.startRecording();
-      _pulseController.repeat(reverse: true);
+      if (audioState.isRecording) {
+        final path = await audioService.stopRecording();
+        _pulseController.stop();
+        _pulseController.value = 0;
+        HapticFeedback.lightImpact();
+        setState(() {
+          _recordingPath = path;
+          _isDone = true;
+        });
+      } else {
+        setState(() {
+          _isDone = false;
+          _recordingPath = null;
+        });
+        await audioService.startRecording();
+        _pulseController.repeat(reverse: true);
+      }
+    } finally {
+      _toggling = false;
     }
   }
 
@@ -115,7 +126,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
     if (scenario == null) {
       return Scaffold(
-        appBar: AppBar(leading: _BackButton()),
+        appBar: AppBar(leadingWidth: 120, leading: _BackButton()),
         body: Center(
           child: Text('Situation not found.',
               style: GoogleFonts.figtree(color: cs.onSurface)),
@@ -136,6 +147,10 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        // AppBar's leading slot defaults to a fixed 56dp (kToolbarHeight) —
+        // plenty for a bare icon, but "Situations" wrapped character by
+        // character inside it. Widen the slot instead of shrinking the text.
+        leadingWidth: 120,
         leading: _BackButton(),
         title: Text(
           scenario.title,
@@ -321,6 +336,8 @@ class _BackButton extends StatelessWidget {
           color: cs.onSurface.withValues(alpha: 0.4)),
       label: Text(
         'Situations',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: GoogleFonts.figtree(
           fontSize: 13,
           color: cs.onSurface.withValues(alpha: 0.4),

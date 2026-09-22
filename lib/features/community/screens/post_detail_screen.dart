@@ -263,25 +263,31 @@ class _PostContent extends StatelessWidget {
           children: [
             InitialAvatar(name: post.displayName, size: 32),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  post.displayName,
-                  style: GoogleFonts.figtree(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    post.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.figtree(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
                   ),
-                ),
-                Text(
-                  _relativeTime(post.createdAt),
-                  style: GoogleFonts.figtree(
-                    fontSize: 12,
-                    color: cs.onSurface.withValues(alpha: 0.35),
+                  Text(
+                    _relativeTime(post.createdAt),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.figtree(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             if (post.situationTag != null) ...[
               const SizedBox(width: 8),

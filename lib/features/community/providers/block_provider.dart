@@ -62,10 +62,17 @@ class BlockNotifier extends StateNotifier<AsyncValue<void>> {
       // until something refetches it — do that now instead of waiting for
       // an unrelated new notification to trigger it.
       _ref.invalidate(notificationsProvider);
-      state = const AsyncValue.data(null);
+      // The invalidations above can trigger a rebuild that drops the last
+      // widget watching this (autoDispose) notifier before this function
+      // resumes — e.g. invalidating publicProfileProvider re-renders the
+      // profile screen into its error/unavailable state, which no longer
+      // reads blockNotifierProvider. Writing to `state` after that throws
+      // "used after dispose". The block/unblock itself already succeeded
+      // server-side at this point, so there's nothing left to report to.
+      if (mounted) state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (mounted) state = AsyncValue.error(e, st);
       return false;
     }
   }
