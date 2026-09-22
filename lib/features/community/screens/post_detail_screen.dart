@@ -238,6 +238,34 @@ class _PostContent extends StatelessWidget {
 
   const _PostContent({required this.post, required this.ref});
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await ref.read(deletePostProvider.notifier).delete(post.id);
+    if (ok) {
+      HapticFeedback.lightImpact();
+      // The post is gone — nothing left to show on this screen, so back
+      // out to the feed rather than leaving the viewer on a detail page
+      // for content that no longer exists.
+      if (context.mounted) context.pop();
+    }
+  }
+
   String _relativeTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'just now';
@@ -256,115 +284,121 @@ class _PostContent extends StatelessWidget {
     final isLiked = override?.isLiked ?? post.isLikedByCurrentUser;
     final likeCount = override?.count ?? post.likeCount;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            InitialAvatar(name: post.displayName, size: 32),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.figtree(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
+    return GestureDetector(
+      onLongPress: currentUser?.id == post.userId
+          ? () => _confirmDelete(context)
+          : null,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InitialAvatar(name: post.displayName, size: 32),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.figtree(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _relativeTime(post.createdAt),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.figtree(
-                      fontSize: 12,
-                      color: cs.onSurface.withValues(alpha: 0.35),
+                    Text(
+                      _relativeTime(post.createdAt),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.figtree(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.35),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (post.situationTag != null) ...[
-              const SizedBox(width: 8),
-              SituationTagChip(situationTag: post.situationTag),
+              if (post.situationTag != null) ...[
+                const SizedBox(width: 8),
+                SituationTagChip(situationTag: post.situationTag),
+              ],
             ],
-          ],
-        ),
-        const SizedBox(height: 14),
-        Text(
-          post.body,
-          style: GoogleFonts.figtree(
-            fontSize: 16,
-            color: cs.onSurface,
-            height: 1.6,
           ),
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: currentUser == null
-                  ? null
-                  : () {
-                      HapticFeedback.lightImpact();
-                      ref.read(likeNotifierProvider.notifier).toggle(
-                            postId: post.id,
-                            currentIsLiked: isLiked,
-                            currentCount: likeCount,
-                            userId: currentUser.id,
-                          );
-                    },
-              child: Row(
-                children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: Icon(
-                      isLiked
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_outline_rounded,
-                      key: ValueKey(isLiked),
-                      size: 18,
-                      color: isLiked
-                          ? AppColors.like
-                          : cs.onSurface.withValues(alpha: 0.35),
+          const SizedBox(height: 14),
+          Text(
+            post.body,
+            style: GoogleFonts.figtree(
+              fontSize: 16,
+              color: cs.onSurface,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: currentUser == null
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        ref.read(likeNotifierProvider.notifier).toggle(
+                              postId: post.id,
+                              currentIsLiked: isLiked,
+                              currentCount: likeCount,
+                              userId: currentUser.id,
+                            );
+                      },
+                child: Row(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        isLiked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_outline_rounded,
+                        key: ValueKey(isLiked),
+                        size: 18,
+                        color: isLiked
+                            ? AppColors.like
+                            : cs.onSurface.withValues(alpha: 0.35),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    '$likeCount',
-                    style: GoogleFonts.figtree(
-                      fontSize: 13,
-                      color: isLiked
-                          ? AppColors.like
-                          : cs.onSurface.withValues(alpha: 0.45),
+                    const SizedBox(width: 5),
+                    Text(
+                      '$likeCount',
+                      style: GoogleFonts.figtree(
+                        fontSize: 13,
+                        color: isLiked
+                            ? AppColors.like
+                            : cs.onSurface.withValues(alpha: 0.45),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 18),
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 16,
-              color: cs.onSurface.withValues(alpha: 0.35),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              '${post.commentCount}',
-              style: GoogleFonts.figtree(
-                fontSize: 13,
-                color: cs.onSurface.withValues(alpha: 0.45),
+              const SizedBox(width: 18),
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.35),
               ),
-            ),
-          ],
-        ),
-      ],
+              const SizedBox(width: 5),
+              Text(
+                '${post.commentCount}',
+                style: GoogleFonts.figtree(
+                  fontSize: 13,
+                  color: cs.onSurface.withValues(alpha: 0.45),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

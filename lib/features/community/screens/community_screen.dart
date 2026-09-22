@@ -637,6 +637,28 @@ class _PostCard extends ConsumerWidget {
   final CommunityPost post;
   const _PostCard({required this.post});
 
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await ref.read(deletePostProvider.notifier).delete(post.id);
+    if (ok) HapticFeedback.lightImpact();
+  }
+
   String _relativeTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'just now';
@@ -657,6 +679,9 @@ class _PostCard extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () => context.push('/post/${post.id}', extra: post),
+      onLongPress: currentUser?.id == post.userId
+          ? () => _confirmDelete(context, ref)
+          : null,
       behavior: HitTestBehavior.opaque,
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),

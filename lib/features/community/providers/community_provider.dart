@@ -315,3 +315,31 @@ final deleteCommentProvider =
     StateNotifierProvider.autoDispose<DeleteCommentNotifier, AsyncValue<void>>((ref) {
   return DeleteCommentNotifier();
 });
+
+// ─── Delete post ──────────────────────────────────────────────────────────────
+
+class DeletePostNotifier extends StateNotifier<AsyncValue<void>> {
+  DeletePostNotifier() : super(const AsyncValue.data(null));
+
+  /// RLS allows this for the post's own author only ("Users can delete
+  /// their own posts" in 20240101000000_initial_schema.sql) — no
+  /// client-side permission check needed beyond deciding whether to show
+  /// the option. Comments and likes on the post cascade automatically
+  /// (community_replies.post_id / post_likes.post_id are both ON DELETE
+  /// CASCADE), and communityPostsProvider's realtime subscription on
+  /// community_posts picks up the delete and refetches on its own — no
+  /// manual feed-state update needed here.
+  Future<bool> delete(String postId) async {
+    try {
+      await _db.from('community_posts').delete().eq('id', postId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+final deletePostProvider =
+    StateNotifierProvider.autoDispose<DeletePostNotifier, AsyncValue<void>>((ref) {
+  return DeletePostNotifier();
+});
