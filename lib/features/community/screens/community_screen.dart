@@ -16,6 +16,7 @@ import '../widgets/circle_icon_button.dart';
 import '../widgets/initial_avatar.dart';
 import '../widgets/pill_tab_bar.dart';
 import '../widgets/situation_tag_chip.dart';
+import '../widgets/suggested_people_row.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -522,16 +523,25 @@ class _PostsFeed extends ConsumerWidget {
       ),
       data: (posts) {
         final sorted = _applySort(posts);
+        // Trending only, not New: shown once per visit to the feed rather
+        // than duplicated across both post-sort tabs, and Trending is the
+        // default tab (see PillTabBar labels order above) so it's the one
+        // every user — including a brand-new one with zero follows and
+        // nothing in Following — actually lands on first.
+        final showSuggestions = sort == _FeedSort.trending;
         if (sorted.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
-            child: Text(
-              'No posts yet. Be the first.',
-              style: GoogleFonts.figtree(
-                fontSize: 15,
-                color: cs.onSurface.withValues(alpha: 0.4),
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            children: [
+              if (showSuggestions) const SuggestedPeopleRow(),
+              Text(
+                'No posts yet. Be the first.',
+                style: GoogleFonts.figtree(
+                  fontSize: 15,
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
               ),
-            ),
+            ],
           );
         }
         return ListView.builder(
@@ -544,8 +554,14 @@ class _PostsFeed extends ConsumerWidget {
           // edge case too would need the FAB or cards to react to content
           // height, which felt like overkill for a handful of seed posts.
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
-          itemCount: sorted.length,
-          itemBuilder: (context, index) => _PostCard(post: sorted[index]),
+          itemCount: sorted.length + (showSuggestions ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (showSuggestions) {
+              if (index == 0) return const SuggestedPeopleRow();
+              return _PostCard(post: sorted[index - 1]);
+            }
+            return _PostCard(post: sorted[index]);
+          },
         );
       },
     );

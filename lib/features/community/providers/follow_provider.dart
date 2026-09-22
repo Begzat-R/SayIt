@@ -117,3 +117,21 @@ final followNotifierProvider =
   ref.watch(currentUserProvider);
   return FollowNotifier(ref);
 });
+
+/// Recently-active accounts to follow — powers the "Suggested for you" row
+/// on the Trending feed, which exists so a brand-new user with zero
+/// follows (and so an empty Following tab) has real people to discover
+/// instead of a dead end. See supabase/migrations/20260922000000_suggested_people.sql
+/// for the query: one RPC that unions recent posts/likes/comments, groups
+/// by author, and excludes the caller, existing follows, and blocked
+/// relationships server-side, rather than fetching everything and
+/// filtering client-side.
+final suggestedPeopleProvider =
+    FutureProvider.autoDispose<List<ProfileSummary>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  final rows = await _db.rpc('suggested_people', params: {'p_limit': 8});
+  return (rows as List)
+      .map((r) => ProfileSummary.fromJson(r as Map<String, dynamic>))
+      .toList();
+});
